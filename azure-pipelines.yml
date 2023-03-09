@@ -1,0 +1,46 @@
+pool:
+  name: pocdemoagent
+variables:
+- group: demo-variables
+steps:
+- script: |
+   git clone https://github.com/Ajay-J-ZS/sqlcmds.git
+   
+   
+  displayName: 'Command Line Script'
+
+- task: PythonScript@0
+  displayName: 'Run a Python script'
+  inputs:
+    scriptSource: inline
+    script: |
+     import os
+     directory = 'sqlcmds'
+     
+     # iterate over files in
+     # that directory
+     for filename in os.listdir(directory):
+         f = os.path.join(directory, filename)
+         # checking if it is a file
+         if os.path.isfile(f) and filename.endswith('.sql'):
+             cmd = "sqlfluff lint {0} --dialect ansi".format(f)
+             os.system(cmd)
+             print(f)
+
+- task: ArchiveFiles@2
+  displayName: 'Archive $(Build.BinariesDirectory)'
+
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish Artifact: drop'
+
+- script: |
+    echo 'Starting bash task'
+      echo "PROJECT_FOLDER $(PROJECT_FOLDER)"
+      python --version
+      echo 'Step 1: Installing schemachange'
+      pip install schemachange --upgrade
+      echo 'Step 2: Running schemachange'
+      schemachange -f $(PROJECT_FOLDER) -a $(SF_ACCOUNT) -u $(SF_USERNAME) -r $(SF_ROLE) -w $(SF_WAREHOUSE) -d $(SF_DATABASE) -c $(SF_DATABASE).SCHEMACHANGE.CHANGE_HISTORY --create-change-history-table
+  displayName: 'Snowflake Execution'
+  env:
+    SNOWFLAKE_PASSWORD: $(SF_PASSWORD)
